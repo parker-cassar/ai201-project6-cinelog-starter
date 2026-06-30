@@ -25,7 +25,7 @@ def add_to_watchlist(user_id, film_id, public=True):
 
     Args:
         user_id (str): UUID of the user.
-        film_id (int): ID of the film. (Note: integer — pre-refactor)
+        film_id (str): UUID of the film.
         public (bool, optional): Whether the entry is visible to other users.
             Defaults to True for consistency with the existing collection
             behaviour. See pr-response.md (Comment 4) for the design rationale.
