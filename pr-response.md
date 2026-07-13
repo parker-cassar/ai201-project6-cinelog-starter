@@ -6,7 +6,8 @@ note.
 
 ## AI Usage
 
-I used AI tooling at three specific points during this review cycle:
+I used AI tooling (Cursor) at several specific points during this review
+cycle:
 
 1. **Codebase orientation (Milestone 1).** Before reading the review
    comments I fed `services/collection_service.py`, `models.py`, and
@@ -27,15 +28,19 @@ I used AI tooling at three specific points during this review cycle:
    rejected it as scope creep for this PR, and the rejection is
    reflected in my response.
 
-3. **Conventional-commit hygiene check (Milestone 4).** After the
-   interactive rebase I pasted `git log --oneline` into an AI and asked
-   it to flag any messages that bundled multiple logical changes or
-   strayed from the conventional format in `CONTRIBUTING.md`. It flagged
-   nothing; I cross-checked against the spec myself.
+3. **Conventional-commit hygiene + history cleanup (Milestone 4).** After
+   the interactive rebase I pasted `git log --oneline` into an AI and
+   asked it to flag any messages that bundled multiple logical changes
+   or strayed from the conventional format in `CONTRIBUTING.md`. That
+   check caught that the original single `test:` commit bundled Comment 3
+   with stretch coverage — I split it into two `test:` commits so each
+   logical change stands alone. I also used AI to help regenerate the
+   `git-log.png` artifact and keep the SHAs in this doc in sync after
+   the rewrite.
 
 I did **not** use AI to write the deduplication code (Comment 2), the
-test (Comment 3), or the substance of the Comment 4/5 arguments —
-those are my own reasoning grounded in CineLog's context.
+Comment 3 nonexistent-film test, or the substance of the Comment 4/5
+arguments — those are my own reasoning grounded in CineLog's context.
 
 ---
 
@@ -77,14 +82,16 @@ new behaviour with the duplicate-add test I added in
 `test_add_to_collection_nonexistent_film_raises` in
 `tests/test_collection.py`. Reused the same fixture pattern (`app`,
 `sample_user`, `sample_film`) so the file reads like its sibling.
-Also added a happy-path test and a duplicate-add test while I was in
-the file — those weren't strictly requested but they cover the
-contract `CONTRIBUTING.md` asks for (happy path + duplicate + missing
-ID) and they exercise the Comment 2 fix.
+The nonexistent-`film_id` case is committed on its own
+(`test: add nonexistent film_id test for add_to_watchlist`) so the
+Comment 3 requirement is a distinct commit. Additional coverage
+(happy path, dedup, sort order, public flag, remove) lives in a
+follow-up `test:` commit — see Stretch below.
 
-**How I verified:** `pytest tests/test_watchlist.py -v` — all three
-watchlist tests pass. `pytest tests/ -v` — full suite (collection +
-watchlist) passes, no regressions.
+**How I verified:** `pytest tests/test_watchlist.py::test_add_to_watchlist_nonexistent_film_raises -v`
+passes against a UUID-shaped fake id
+(`00000000-0000-0000-0000-000000000000`). `pytest tests/ -v` —
+full suite (collection + watchlist) passes, no regressions.
 
 ## Comment 4 — Default visibility (`public=True`)
 
@@ -227,24 +234,28 @@ into the work above:
   `test_add_to_watchlist_respects_public_flag` covers both branches.
 
 **Second test I chose to write (stretch):**
-`test_get_watchlist_returns_newest_first`. I chose this case
-specifically because it pins down the Comment 5 decision in
-executable form — if a future contributor flips the sort order back
-to alphabetical the test fails, and the failure points them at the
-documented decision in this file. Sort order is exactly the kind of
-quiet behavioural contract that breaks silently without a test.
+`test_get_watchlist_returns_newest_first`, committed separately from
+the Comment 3 nonexistent-film test
+(`test: add watchlist edge cases for dedup, sort, public, and remove`).
+I chose this case specifically because it pins down the Comment 5
+decision in executable form — if a future contributor flips the sort
+order back to alphabetical the test fails, and the failure points them
+at the documented decision in this file. Sort order is exactly the
+kind of quiet behavioural contract that breaks silently without a
+test.
 
 ---
 
 ## Final git log
 
 Output of `git log --oneline origin/main..HEAD` on `feature/watchlist`
-after the interactive rebase (10 conventional commits, no merge
-commits):
+after the interactive rebase (conventional commits, no merge commits):
 
 ```
-36aa4c0 docs: add pr-response.md with review responses and design decisions
-046348e test: add watchlist tests covering dedup, missing film, sort order, public flag, and remove
+773358d docs: add .gitignore for venv, caches, and database files
+0c615a9 docs: add pr-response.md with review responses and design decisions
+20c3ac5 test: add watchlist edge cases for dedup, sort, public, and remove
+67de5f4 test: add nonexistent film_id test for add_to_watchlist
 5d7b3b1 fix: update WatchlistEntry film_id and docs to UUID after main refactor
 50fe8f7 feat: add explicit public parameter to add_to_watchlist
 fa71bde feat: add remove_from_watchlist service and DELETE endpoint
@@ -255,23 +266,20 @@ dbebde1 fix: update film retrieval method to use db.session.get in collection an
 8b848dd feat: add watchlist endpoint and service module
 ```
 
+Screenshot of that history (committed as `git-log.png`; one additional tip
+`docs:` commit on HEAD embeds this screenshot into `pr-response.md`):
+
+![git log --oneline on feature/watchlist](git-log.png)
+
 Verification:
 
 - `git log --merges origin/main..HEAD | wc -l` → `0` (no merge commits).
-- `git log --oneline origin/main..HEAD | wc -l` → `10` (≥ 4 commits as
-  required).
+- `git log --oneline origin/main..HEAD | wc -l` → `13` (≥ 4 commits as
+  required; the tip docs commit that embeds the screenshot is the 13th).
 - Every message uses a conventional prefix (`feat:`, `fix:`, `test:`,
   `docs:`) and describes one logical change.
-
-> **Screenshot note.** The rubric also asks for a screenshot of this
-> output included in `pr-response.md`. I am unable to generate
-> screenshots directly from this environment, so I have included the
-> verbatim text block above instead — the SHAs are reproducible from
-> the branch and match what `git log --oneline` prints. Before final
-> submission I need to attach a screenshot of the same `git log
-> --oneline` output to this document (or commit a `git-log.png` file
-> at the repo root). See the "What you still need to do manually"
-> section at the very bottom of this file.
+- Comment 3 and the stretch “second test” are separate `test:` commits
+  (`67de5f4` vs `20c3ac5`).
 
 ## PR Description
 
@@ -344,23 +352,12 @@ feature.
 
 ---
 
-## Things to do manually before submitting
+## Submission checklist
 
-Most of this project is done in-tree, but a few steps must be done by
-hand:
-
-1. **Attach the `git log --oneline` screenshot.** The rubric asks for
-   a screenshot of the final history embedded in `pr-response.md`.
-   The verbatim text is included above, but the visual artifact is
-   not — take the screenshot from your terminal (`git log --oneline
-   origin/main..HEAD`), commit it as `git-log.png` at the repo root,
-   and reference it from the "Final git log" section above.
-
-2. **Open the PR on your fork.** A PR from `feature/watchlist` → `main`
-   on `parker-cassar/ai201-project6-cinelog-starter` may need to be
-   opened from the GitHub UI if `gh pr create` was not used. Confirm
-   that the PR description on GitHub matches the "PR Description"
-   section above (you can paste it directly).
-
-3. **Course-portal submission.** Submit the link to the fork + the PR
-   per the project instructions.
+- [x] `feature/watchlist` rebased on `main`; linear history, no merge commits
+- [x] Conventional commits (`feat:` / `fix:` / `test:` / `docs:`), ≥ 4 commits
+- [x] `pr-response.md` covers all six comments + AI Usage + PR description
+- [x] `git-log.png` screenshot embedded above
+- [x] PR open: https://github.com/parker-cassar/ai201-project6-cinelog-starter/pull/1
+- [ ] Course-portal submission: branch URL
+  `https://github.com/parker-cassar/ai201-project6-cinelog-starter/tree/feature/watchlist`
